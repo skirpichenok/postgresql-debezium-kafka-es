@@ -1,7 +1,9 @@
 package com.example;
 
+import com.google.gson.JsonParser;
 import com.jsoniter.JsonIterator;
 import com.jsoniter.any.Any;
+import com.jsoniter.output.JsonStream;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -22,7 +24,7 @@ public class RCCConsumer {
     private static final String RCC_INFO_SQL = "select json_agg(t) from (" +
             "select item_data.id as item_data_id, item_form_metadata.item_data_type_id as item_data_type_id, " +
             "item_data.tenant_id as tenant_id, study.name as study_name, study.id as study_id, study_site.id as study_site_id, " +
-            "site.name as study_site_name, subject.unique_identifier, subject.id as subject_id, " +
+            "site.name as study_site_name, subject.unique_identifier, subject.id as subject_id, study_event.id as study_event_id, " +
             "study_event_definition.name as event_name, study_event_definition.id as event_def_id, study_event_definition.repeating as event_def_repeating, " +
             "(case when study_event.repeating_form_parent_id isnull then study_event.occurence else parent_study_event.occurence end)as event_occurrence, " +
             "(case when event_definition_crf.repeating then (case when study_event.repeating_form_parent_id isnull then 1 else study_event.occurence end) else null end) as crf_occurrence, " +
@@ -55,6 +57,10 @@ public class RCCConsumer {
 
     private static KafkaConsumer<String, String> consumer;
 
+    private static final Set<String> CACHE = new HashSet<>();
+
+    private static final JsonParser JSON_PARSER = new JsonParser();
+
     private static final String ES_TOPIC = "test-elasticsearch-sink";
 
     private static final String DB_TOPIC = "DB_TEST_SERVER.public.rc_item_data";
@@ -76,6 +82,8 @@ public class RCCConsumer {
             producerProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
             producerProps.put("schema.registry.url", "http://localhost:8081");
             producerProps.put("batch.size", "100000");
+            //producerProps.put("buffer.memory", "1000000");
+            //producerProps.put("max.request.size", "10000000");
 
             producer = new KafkaProducer<>(producerProps);
             producer.initTransactions();
@@ -159,23 +167,46 @@ public class RCCConsumer {
             if (rs.next()) {
                 Any jsonData = JsonIterator.deserialize(rs.getString(1));
                 for (Any jsonElement : jsonData) {
+                    // build index id
+                    String indexId = jsonElement.get("subject_id").toString().concat("_").concat(jsonElement.get("study_event_id").toString());
+
+                    Map<String, Any> map;
                     Any value = jsonElement.get("field_value");
-                    String fieldName = jsonElement.get("field_name").toString();
+                    String fieldName = jsonElement.get("field_name").toString().
+                            concat("_").concat(jsonElement.get("study_id").toString()).
+                            concat("_").concat(jsonElement.get("item_data_type_id").toString());
                     String fieldValue = value.as(Any.class) != null ? value.toString() : "";
-                    Map<String, Any> map = jsonElement.asMap();
-                    map.remove("field_name");
-                    map.remove("field_value");
-                    map.put(fieldName, Any.wrap(fieldValue));
+
+                    if (CACHE.add(indexId)) {
+                        map = jsonElement.asMap();
+                        map.remove("field_name");
+                        map.remove("field_value");
+                        map.put(fieldName, Any.wrap(JsonStream.serialize(fieldValue)));
+                    } else {
+                        jsonElement = JsonIterator.deserialize("{}");
+                        map = jsonElement.asMap();
+                    }
+
+                    map.put(fieldName, Any.wrap(JsonStream.serialize(fieldValue)));
+
+                    // async save
                     producer.send(new ProducerRecord<>(
                             ES_TOPIC,
-                            jsonElement.get("subject_id").toString().concat("_").
-                            concat(jsonElement.get("item_data_id").toString()),
+                            indexId,
                             jsonElement.toString())
                     );
+                    /*
+                    producer.send(new ProducerRecord<>(
+                            ES_TOPIC,
+                            jsonElement.get("item_data_id").toString(),
+                            jsonElement.toString())
+                    );
+                    */
                 }
             }
         }
         ids.clear();
+        producer.flush();
         producer.commitTransaction();
     }
 }
