@@ -82,7 +82,6 @@ public class RCCConsumer {
             producerProps.put("batch.size", "100000");
             producer = new KafkaProducer<String, String>(producerProps);
             producer.initTransactions();
-            producer.beginTransaction();
 
             Properties consumerProps = new Properties();
             consumerProps.put("bootstrap.servers", "localhost:9092");
@@ -159,7 +158,7 @@ public class RCCConsumer {
     private static void processIds(Connection connectionTo, List<Long> ids) throws SQLException {
         c += ids.size();
         System.out.println(" c: " + c);
-        //producer.beginTransaction();
+        producer.beginTransaction();
         try (ResultSet rs = connectionTo.createStatement().executeQuery(RCC_INFO_SQL.replace("?", ids.toString().replaceAll("\\]|\\[", "")))) {
             if (rs.next()) {
                 JsonElement jsonData = JSON_PARSER.parse(rs.getString(1));
@@ -176,6 +175,6 @@ public class RCCConsumer {
         }
         ids.clear();
         producer.flush();
-        //producer.commitTransaction();
+        producer.commitTransaction();
     }
 }
