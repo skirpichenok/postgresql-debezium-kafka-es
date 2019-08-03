@@ -90,6 +90,13 @@ public class RCCConsumer {
 
             System.out.println("start: " + sdf.format(new Date()));
 
+            //
+            //start: 2019-08-03 16:09:24
+            //end: 2019-08-03 16:24:18
+            //15 min
+            // ES +
+            // total ~ min
+
             while (true) {
                 ConsumerRecords<String, String> records = consumer.poll(100L);
                 if (records == null) {
