@@ -74,14 +74,15 @@ public class RCCConsumer {
             final String clientId = "client01";
 
             Properties producerProps = new Properties();
-            //producerProps.put("transactional.id","T1");
+            producerProps.put("transactional.id","T1");
             producerProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
             producerProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
             producerProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
             producerProps.put("schema.registry.url", "http://localhost:8081");
-            producerProps.put("batch.size", "1000");
+            producerProps.put("batch.size", "100000");
             producer = new KafkaProducer<String, String>(producerProps);
-            //producer.initTransactions();
+            producer.initTransactions();
+            producer.beginTransaction();
 
             Properties consumerProps = new Properties();
             consumerProps.put("bootstrap.servers", "localhost:9092");
@@ -145,7 +146,7 @@ public class RCCConsumer {
                     }
                     ids.add(Long.parseLong(jsonObject.getAsJsonObject("after").get("id").toString()));
                     //processIds(connectionTo, ps, jsonParser, ids);
-                    if (ids.size() % 1000000 == 0) {
+                    if (ids.size() % 100000 == 0) {
                         processIds(pgConnectionTo, ids);
                     }
                     // print the offset,key and value for the consumer records.
@@ -174,6 +175,7 @@ public class RCCConsumer {
             }
         }
         ids.clear();
+        producer.flush();
         //producer.commitTransaction();
     }
 }
