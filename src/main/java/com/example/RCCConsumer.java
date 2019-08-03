@@ -110,23 +110,22 @@ public class RCCConsumer {
                     if (record == null) {
                         continue;
                     }
-                    String type = "";
                     Any jsonObject = JsonIterator.deserialize(record.value());
-                    if (jsonObject == null || jsonObject.get("before") == null || jsonObject.get("after") == null) {
+                    if (jsonObject == null) {
                         continue;
                     }
                     if (jsonObject.get("before").as(Any.class) == null && jsonObject.get("after").as(Any.class) == null ) {
                         continue;
                     }
                     if (jsonObject.get("before").as(Any.class) == null  && jsonObject.get("after").as(Any.class) != null ) {
-                        type = "INSERT";
+                        // INSERT
                     }
                     if (jsonObject.get("before").as(Any.class) != null  && jsonObject.get("after").as(Any.class) == null ) {
-                        type = "DELETE";
+                        // DELETE
                         continue;
                     }
                     if (jsonObject.get("before").as(Any.class) != null  && jsonObject.get("after").as(Any.class) != null ) {
-                        type = "UPDATE";
+                        // UPDATE
                         continue;
                     }
                     ids.add(Long.parseLong(jsonObject.get("after").get("id").toString()));
