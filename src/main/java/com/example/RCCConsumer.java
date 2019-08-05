@@ -114,9 +114,9 @@ public class RCCConsumer {
             System.out.println("start: " + sdf.format(new Date()));
 
             //22 371 119
-            //start: 2019-08-05 16:00:09
-            //end: 2019-08-05 16:06:33
-            //370 995
+            //start: 2019-08-05 16:28:11
+            //end: 2019-08-05 16:41:01
+            //308 270
             //~  mins
 
             while (true) {
@@ -132,6 +132,16 @@ public class RCCConsumer {
                 if (emptyC > 50 && started && !ids.isEmpty() && !finished) {
                     finished = true;
                     processIds(pgConnectionTo, ids);
+                    producer.beginTransaction();
+                    for (String indexId : cache.getKeys()) {
+                        producer.send(new ProducerRecord<>(
+                                ES_TOPIC,
+                                indexId,
+                                cache.get(indexId))
+                        );
+                    }
+                    producer.flush();
+                    producer.commitTransaction();
                     System.out.println("cache size: " + cache.size());
                     System.out.println("total count: " + globalCount);
                     System.out.println("end: " + sdf.format(new Date()));
@@ -169,7 +179,7 @@ public class RCCConsumer {
 
     private static void processIds(Connection connectionTo, List<Long> ids) throws SQLException {
         globalCount += ids.size();
-        producer.beginTransaction();
+        //producer.beginTransaction();
         System.out.println("count: " + globalCount);
         try (ResultSet rs = connectionTo.createStatement().executeQuery(RCC_INFO_SQL.replace("?", ids.toString().replaceAll("\\]|\\[", EMPTY)))) {
             if (rs.next()) {
@@ -191,17 +201,18 @@ public class RCCConsumer {
                     String jsonString = cache.computeIfAbsent(indexId, v -> jsonElement.toString());
                     Any jsonElementData = JsonIterator.deserialize(jsonString);
                     jsonElementData.asMap().put(fieldName, Any.wrap(JsonStream.serialize(fieldValue)));
-
+                    /*
                     producer.send(new ProducerRecord<>(
                             ES_TOPIC,
                             indexId,
                             jsonElementData.toString())
                     );
+                    */
                 }
             }
         }
         ids.clear();
-        producer.flush();
-        producer.commitTransaction();
+        //producer.flush();
+        //producer.commitTransaction();
     }
 }
