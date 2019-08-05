@@ -34,7 +34,8 @@ public class RCCConsumer {
             "study_event_definition.name as event_name, study_event_definition.id as event_def_id, study_event_definition.repeating as event_def_repeating, " +
             "(case when study_event.repeating_form_parent_id isnull then study_event.occurence else parent_study_event.occurence end)as event_occurrence, " +
             "(case when event_definition_crf.repeating then (case when study_event.repeating_form_parent_id isnull then 1 else study_event.occurence end) else null end) as crf_occurrence, " +
-            "crf_entry.id as event_crf_id, crf.name as crf_name, " +
+            "crf.name as crf_name, " +
+            //"crf_entry.id as event_crf_id, " +
             //"(case when crf_version.version_name isnull or crf_version.version_name = '' then 'original' else crf_version.version_name end) as crf_version_name, " +
             "item_group_type.lookup_code as item_group_type, item_data.value_index as repeating_group_number,  " +
             "item.variable_name as field_name, item_data_value.value as field_value " +
@@ -112,9 +113,9 @@ public class RCCConsumer {
 
             System.out.println("start: " + sdf.format(new Date()));
 
-            //
-            //start:
-            //end:
+            //22 371 119
+            //start: 2019-08-05 15:25:29
+            //end: 2019-08-05 15:33:45
             //~ 15 mins
 
             while (true) {

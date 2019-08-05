@@ -9,6 +9,7 @@ import org.apache.kafka.common.serialization.StringSerializer;
 import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 
+@Deprecated
 public class ESProducer {
 
     private static final String TOPIC = "test-elasticsearch-sink";
