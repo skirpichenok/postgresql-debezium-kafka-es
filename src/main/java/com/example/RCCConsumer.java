@@ -53,7 +53,7 @@ public class RCCConsumer {
 
     private static int globalCount = 0;
 
-    private static Producer<String, String> producer;
+    private static KafkaProducer<String, String> producer;
 
     private static KafkaConsumer<String, String> consumer;
 
@@ -81,9 +81,7 @@ public class RCCConsumer {
             producerProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
             producerProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
             producerProps.put("schema.registry.url", "http://localhost:8081");
-            producerProps.put("batch.size", "100000");
-            //producerProps.put("buffer.memory", "1000000");
-            //producerProps.put("max.request.size", "10000000");
+            producerProps.put("batch.size", "10000");
 
             producer = new KafkaProducer<>(producerProps);
             producer.initTransactions();
