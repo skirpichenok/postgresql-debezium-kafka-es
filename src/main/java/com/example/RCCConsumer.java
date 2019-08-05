@@ -42,8 +42,8 @@ public class RCCConsumer {
             "from rc_item_data item_data " +
             "join rc_item_form_metadata item_form_metadata on item_form_metadata.id = item_data.rc_item_form_metadata_id " +
             "join rc_subjects subject on subject.id = item_data.subject_id " +
-            "join rc_crf_versions crf_version on crf_version.id = item_form_metadata.crf_version_id " +
-            "join rc_crfs crf on crf.id = crf_version.crf_id " +
+            "left join rc_crf_versions crf_version on crf_version.id = item_form_metadata.crf_version_id " +
+            "left join rc_crfs crf on crf.id = crf_version.crf_id " +
             "join rc_items item on item.id = item_form_metadata.item_id " +
             "join rc_studies study on study.id = subject.study_id " +
             "left join rc_study_sites study_site on study_site.id = subject.study_site_id " +
