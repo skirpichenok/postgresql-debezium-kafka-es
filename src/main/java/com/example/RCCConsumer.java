@@ -116,6 +116,7 @@ public class RCCConsumer {
             //22 371 119
             //start: 2019-08-05 16:00:09
             //end: 2019-08-05 16:06:33
+            //370 995
             //~  mins
 
             while (true) {
