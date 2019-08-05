@@ -56,7 +56,7 @@ public class RCCConsumer {
             "left join rc_item_data_values item_data_value on item_data_value.rc_item_data_id = item_data.id " +
             "left join rc_item_groups item_group on item_group.id = item_form_metadata.group_id " +
             "left join ad_lookup_codes item_group_type on item_group_type.id = item_group.id " +
-            "where item.variable_name ~* '^[A_Z][A-Z0-9_]+$' and item_data.id IN (?)) t";
+            "where item.variable_name ~* '^[A-Z][A-Z0-9_]+$' and item_data.id IN (?)) t";
 
     private static int globalCount = 0;
 
@@ -113,10 +113,10 @@ public class RCCConsumer {
 
             System.out.println("start: " + sdf.format(new Date()));
 
-            //22 371 119
-            //start: 2019-08-05 15:25:29
-            //end: 2019-08-05 15:33:45
-            //~ 15 mins
+            //
+            //start: 2019-08-05 16:00:09
+            //end:
+            //~  mins
 
             while (true) {
                 ConsumerRecords<String, String> records = consumer.poll(100L);
