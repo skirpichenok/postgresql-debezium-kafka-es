@@ -133,6 +133,7 @@ public class RCCConsumer {
                 if (emptyC > 50 && started && !ids.isEmpty() && !finished) {
                     finished = true;
                     processIds(pgConnectionTo, ids);
+                    /*
                     producer.beginTransaction();
                     for (String indexId : cache.getKeys()) {
                         producer.send(new ProducerRecord<>(
@@ -143,6 +144,7 @@ public class RCCConsumer {
                     }
                     producer.flush();
                     producer.commitTransaction();
+                    */
                     System.out.println("cache size: " + cache.size());
                     System.out.println("total count: " + globalCount);
                     System.out.println("end: " + sdf.format(new Date()));
@@ -180,7 +182,7 @@ public class RCCConsumer {
 
     private static void processIds(Connection connectionTo, List<Long> ids) throws SQLException {
         globalCount += ids.size();
-        //producer.beginTransaction();
+        producer.beginTransaction();
         System.out.println("count: " + globalCount);
         try (ResultSet rs = connectionTo.createStatement().executeQuery(RCC_INFO_SQL.replace("?", ids.toString().replaceAll("\\]|\\[", EMPTY)))) {
             if (rs.next()) {
@@ -204,18 +206,17 @@ public class RCCConsumer {
                     jsonElementData.asMap().put(fieldName, Any.wrap(JsonStream.serialize(fieldValue)));
 
                     cache.put(indexId, jsonElementData.toString());
-                    /*
+
                     producer.send(new ProducerRecord<>(
                             ES_TOPIC,
                             indexId,
                             jsonElementData.toString())
                     );
-                    */
                 }
             }
         }
         ids.clear();
-        //producer.flush();
-        //producer.commitTransaction();
+        producer.flush();
+        producer.commitTransaction();
     }
 }
