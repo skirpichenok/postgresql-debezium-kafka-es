@@ -116,8 +116,9 @@ public class RCCConsumer {
             //22 371 119
             //start: 2019-08-05 16:28:11
             //end: 2019-08-05 16:41:01
-            //308 270
-            //~  mins
+            //es end: 16:48
+            //308 270 indexes
+            //~30 mins
 
             while (true) {
                 ConsumerRecords<String, String> records = consumer.poll(100L);
@@ -201,6 +202,8 @@ public class RCCConsumer {
                     String jsonString = cache.computeIfAbsent(indexId, v -> jsonElement.toString());
                     Any jsonElementData = JsonIterator.deserialize(jsonString);
                     jsonElementData.asMap().put(fieldName, Any.wrap(JsonStream.serialize(fieldValue)));
+
+                    cache.put(indexId, jsonElementData.toString());
                     /*
                     producer.send(new ProducerRecord<>(
                             ES_TOPIC,
