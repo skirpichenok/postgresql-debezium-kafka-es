@@ -112,12 +112,10 @@ public class RCCConsumer {
 
             System.out.println("start: " + sdf.format(new Date()));
 
-            //8,943,790
-            //start: 2019-08-03 16:09:24
-            //end: 2019-08-03 16:24:18
-            //15 min
-            // ES +
-            // total ~ min
+            //
+            //start:
+            //end:
+            //~ 15 mins
 
             while (true) {
                 ConsumerRecords<String, String> records = consumer.poll(100L);
@@ -169,8 +167,8 @@ public class RCCConsumer {
 
     private static void processIds(Connection connectionTo, List<Long> ids) throws SQLException {
         globalCount += ids.size();
-        System.out.println("count: " + globalCount);
         producer.beginTransaction();
+        System.out.println("count: " + globalCount);
         try (ResultSet rs = connectionTo.createStatement().executeQuery(RCC_INFO_SQL.replace("?", ids.toString().replaceAll("\\]|\\[", EMPTY)))) {
             if (rs.next()) {
                 Any jsonData = JsonIterator.deserialize(rs.getString(1));
@@ -197,18 +195,11 @@ public class RCCConsumer {
                             indexId,
                             jsonElementData.toString())
                     );
-
-                    /*
-                    producer.send(new ProducerRecord<>(
-                            ES_TOPIC,
-                            jsonElement.get("item_data_id").toString(),
-                            jsonElement.toString())
-                    );
-                    */
                 }
             }
         }
         ids.clear();
+        producer.flush();
         producer.commitTransaction();
     }
 }
