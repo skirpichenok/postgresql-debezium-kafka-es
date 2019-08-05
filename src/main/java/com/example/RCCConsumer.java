@@ -81,7 +81,7 @@ public class RCCConsumer {
             producerProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
             producerProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
             producerProps.put("schema.registry.url", "http://localhost:8081");
-            producerProps.put("batch.size", "10000");
+            producerProps.put("batch.size", "100000");
 
             producer = new KafkaProducer<>(producerProps);
             producer.initTransactions();
@@ -193,6 +193,7 @@ public class RCCConsumer {
                             indexId,
                             jsonElement.toString())
                     );
+
                     /*
                     producer.send(new ProducerRecord<>(
                             ES_TOPIC,
