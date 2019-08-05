@@ -7,13 +7,15 @@ import com.jsoniter.output.JsonStream;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
-import org.apache.kafka.clients.producer.KafkaProducer;
-import org.apache.kafka.clients.producer.Producer;
-import org.apache.kafka.clients.producer.ProducerConfig;
-import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.clients.producer.*;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.StringSerializer;
+import org.mapdb.DB;
+import org.mapdb.DBMaker;
+import org.mapdb.HTreeMap;
+import org.mapdb.Serializer;
 
+import java.io.File;
 import java.sql.*;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -21,15 +23,20 @@ import java.util.Date;
 
 public class RCCConsumer {
 
+    private static final String RCC_ITEMS_SQL = "select concat(i.variable_name, '_', i.study_id, '_', ifm.item_data_type_id) " +
+            "from rc_item_form_metadata ifm "+
+            "join rc_items i on i.id = ifm.item_id "+
+            "where  i.variable_name notnull and i.variable_name !='' and i.variable_name ~* '^[A-Z][A-Z0-9_]+$'";
+
     private static final String RCC_INFO_SQL = "select json_agg(t) from (" +
             "select item_data.id as item_data_id, item_form_metadata.item_data_type_id as item_data_type_id, " +
             "item_data.tenant_id as tenant_id, study.name as study_name, study.id as study_id, study_site.id as study_site_id, " +
-            "site.name as study_site_name, subject.unique_identifier, subject.id as subject_id, study_event.id as study_event_id, " +
+            "site.name as study_site_name, subject.unique_identifier as subject_name, subject.id as subject_id, study_event.id as study_event_id, " +
             "study_event_definition.name as event_name, study_event_definition.id as event_def_id, study_event_definition.repeating as event_def_repeating, " +
             "(case when study_event.repeating_form_parent_id isnull then study_event.occurence else parent_study_event.occurence end)as event_occurrence, " +
             "(case when event_definition_crf.repeating then (case when study_event.repeating_form_parent_id isnull then 1 else study_event.occurence end) else null end) as crf_occurrence, " +
             "crf_entry.id as event_crf_id, crf.name as crf_name, " +
-            "(case when crf_version.version_name isnull or crf_version.version_name = '' then 'original' else crf_version.version_name end) as crf_version_name, " +
+            //"(case when crf_version.version_name isnull or crf_version.version_name = '' then 'original' else crf_version.version_name end) as crf_version_name, " +
             "item_group_type.lookup_code as item_group_type, item_data.value_index as repeating_group_number,  " +
             "item.variable_name as field_name, item_data_value.value as field_value " +
             "from rc_item_data item_data " +
@@ -53,11 +60,13 @@ public class RCCConsumer {
 
     private static int globalCount = 0;
 
+    private static final String EMPTY = "";
+
+    private static HTreeMap<String, String> cache;
+
     private static KafkaProducer<String, String> producer;
 
     private static KafkaConsumer<String, String> consumer;
-
-    private static final Set<String> CACHE = new HashSet<>();
 
     private static final JsonParser JSON_PARSER = new JsonParser();
 
@@ -67,13 +76,14 @@ public class RCCConsumer {
 
     @SuppressWarnings("InfiniteLoopStatement")
     public static void main(String[] args) throws Exception {
-        try (Connection pgConnectionTo = DriverManager.getConnection("jdbc:postgresql://localhost:5432/nphase", "postgres", "postgres")) {
+        try (DB dbDisk = DBMaker.fileDB("rcc_consumer_cache_".concat(Long.toString(System.currentTimeMillis())).concat(".tmp")).make();
+             Connection pgConnectionTo = DriverManager.getConnection("jdbc:postgresql://localhost:5432/nphase", "postgres", "postgres")) {
             int emptyC = 0;
             boolean started = false;
             boolean finished = false;
-            pgConnectionTo.setAutoCommit(false);
             List<Long> ids = new ArrayList<>();
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+            cache = dbDisk.hashMap("onDisk", Serializer.STRING, Serializer.STRING).create();
 
             Properties producerProps = new Properties();
             producerProps.put("transactional.id","T1");
@@ -123,6 +133,7 @@ public class RCCConsumer {
                 if (emptyC > 50 && started && !ids.isEmpty() && !finished) {
                     finished = true;
                     processIds(pgConnectionTo, ids);
+                    System.out.println("cache size: " + cache.size());
                     System.out.println("total count: " + globalCount);
                     System.out.println("end: " + sdf.format(new Date()));
                 }
@@ -161,37 +172,31 @@ public class RCCConsumer {
         globalCount += ids.size();
         System.out.println("count: " + globalCount);
         producer.beginTransaction();
-        try (ResultSet rs = connectionTo.createStatement().executeQuery(RCC_INFO_SQL.replace("?", ids.toString().replaceAll("\\]|\\[", "")))) {
+        try (ResultSet rs = connectionTo.createStatement().executeQuery(RCC_INFO_SQL.replace("?", ids.toString().replaceAll("\\]|\\[", EMPTY)))) {
             if (rs.next()) {
                 Any jsonData = JsonIterator.deserialize(rs.getString(1));
-                for (Any jsonElement : jsonData) {
+                for (final Any jsonElement : jsonData) {
                     // build index id
                     String indexId = jsonElement.get("subject_id").toString().concat("_").concat(jsonElement.get("study_event_id").toString());
 
-                    Map<String, Any> map;
                     Any value = jsonElement.get("field_value");
                     String fieldName = jsonElement.get("field_name").toString().
                             concat("_").concat(jsonElement.get("study_id").toString()).
                             concat("_").concat(jsonElement.get("item_data_type_id").toString());
-                    String fieldValue = value.as(Any.class) != null ? value.toString() : "";
+                    String fieldValue = value.as(Any.class) != null ? value.toString() : EMPTY;
 
-                    if (CACHE.add(indexId)) {
-                        map = jsonElement.asMap();
-                        map.remove("field_name");
-                        map.remove("field_value");
-                        map.put(fieldName, Any.wrap(JsonStream.serialize(fieldValue)));
-                    } else {
-                        jsonElement = JsonIterator.deserialize("{}");
-                        map = jsonElement.asMap();
-                    }
+                    Map<String, Any>  map = jsonElement.asMap();
+                    map.remove("field_name");
+                    map.remove("field_value");
 
-                    map.put(fieldName, Any.wrap(JsonStream.serialize(fieldValue)));
+                    String jsonString = cache.computeIfAbsent(indexId, v -> jsonElement.toString());
+                    Any jsonElementData = JsonIterator.deserialize(jsonString);
+                    jsonElementData.asMap().put(fieldName, Any.wrap(JsonStream.serialize(fieldValue)));
 
-                    // async save
                     producer.send(new ProducerRecord<>(
                             ES_TOPIC,
                             indexId,
-                            jsonElement.toString())
+                            jsonElementData.toString())
                     );
 
                     /*
@@ -205,7 +210,6 @@ public class RCCConsumer {
             }
         }
         ids.clear();
-        producer.flush();
         producer.commitTransaction();
     }
 }
