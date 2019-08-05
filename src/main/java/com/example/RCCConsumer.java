@@ -113,9 +113,9 @@ public class RCCConsumer {
 
             System.out.println("start: " + sdf.format(new Date()));
 
-            //
+            //22 371 119
             //start: 2019-08-05 16:00:09
-            //end:
+            //end: 2019-08-05 16:06:33
             //~  mins
 
             while (true) {
